@@ -11,19 +11,45 @@ export default function ForgetPasswordPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [useremail, setUseremail] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token_partner");
-
-    if (token && isValidToken(token)) {
-      router.replace("/dashboard");
-    }
-  }, [router]);
+      const checkAuth = () => {
+        const token = localStorage.getItem("token_partner");
+        if (token && isValidToken(token)) {
+          router.replace("/dashboard");
+        } else {
+          setCheckingAuth(false);
+        }
+      };
+  
+      checkAuth();
+  
+      const handlePageShow = (e: PageTransitionEvent) => {
+        if (e.persisted) {
+          const token = localStorage.getItem("token_partner");
+          if (token && isValidToken(token)) {
+            window.location.replace("/dashboard/");
+          } else {
+            setCheckingAuth(false);
+          }
+        }
+      };
+  
+      window.addEventListener("pageshow", handlePageShow);
+  
+      return () => {
+        window.removeEventListener("pageshow", handlePageShow);
+      };
+    }, [router]);
 
   const handleforgetpassword = async (e: React.FormEvent) => {
 
     e.preventDefault();
+    if (isLoading) return;
     setErrorMsg("");
+    setIsLoading(true);
 
     try {
       const response = await axios.post(
@@ -44,8 +70,39 @@ export default function ForgetPasswordPage() {
     } catch (error: any) {
       console.error("Login Error:", error);
       setErrorMsg("Invalid credentials. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <>
+        <div className="min-h-screen bg-[#F5F7FA] text-[#202328] flex items-center justify-center">
+          <svg
+            className="animate-spin h-10 w-10 text-[#462EFC]"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
+          </svg>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F7FA] justify-end">
@@ -54,7 +111,7 @@ export default function ForgetPasswordPage() {
         <img
           src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Group-4.png`}
           alt="Decorative top left"
-          className="absolute top-0 left-0 w-[30%] h-[80%] pointer-events-none"
+          className="absolute top-0 left-0 w-[30%] h-[50%] pointer-events-none"
         />
         <img
           src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/logo-relayback.png`}

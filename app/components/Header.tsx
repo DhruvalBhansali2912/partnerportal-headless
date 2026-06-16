@@ -80,7 +80,7 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem("token_partner");
     localStorage.removeItem("company");
-    router.push("/");
+    router.replace("/");
   };
 
   const handleMainPage = () => {

@@ -86,7 +86,7 @@ export default function SetPasswordPage() {
         <img
           src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Group-4.png`}
           alt="Decorative top left"
-          className="absolute top-0 left-0 w-[30%] h-[80%] pointer-events-none"
+          className="absolute top-0 left-0 w-[30%] h-[50%] pointer-events-none"
         />
         <img
           src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/logo-relayback.png`}
