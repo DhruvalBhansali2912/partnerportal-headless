@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState,useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useSession } from "./SessionContext";
 
@@ -16,7 +16,7 @@ export default function Header() {
 
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Select a category");
-  const categoryOptions = ["Feedback", "Question","Others"];
+  const categoryOptions = ["Feedback", "Question", "Others"];
 
   const [supportName, setSupportName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
@@ -32,6 +32,8 @@ export default function Header() {
   const [leadMessage, setLeadMessage] = useState("");
 
   const [leadSuccess, setLeadSuccess] = useState(false);
+  const [leadSubmitting, setLeadSubmitting] = useState(false);
+  const [leadErrors, setLeadErrors] = useState<{ [key: string]: string }>({});
 
   const handleSupport = () => {
     setShowSupportModal(true);
@@ -41,25 +43,50 @@ export default function Header() {
   };
 
   const handleLeadSubmit = async () => {
+    const errors: { [key: string]: string } = {};
+
+    if (!leadCompany.trim()) errors.leadCompany = "Company name is required.";
+    if (!leadContactName.trim())
+      errors.leadContactName = "Contact name is required.";
+    if (!leadEmail.trim()) {
+      errors.leadEmail = "Customer email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadEmail)) {
+      errors.leadEmail = "Enter a valid email address.";
+    }
+    if (!leadCountry.trim()) errors.leadCountry = "Country code is required.";
+    if (!leadPhone.trim()) errors.leadPhone = "Phone number is required.";
+
+    if (Object.keys(errors).length > 0) {
+      setLeadErrors(errors);
+      return;
+    }
+
+    setLeadErrors({});
+    setLeadSubmitting(true);
+
     try {
       const token = localStorage.getItem("token_partner");
       const userEmail = localStorage.getItem("valid_user_email");
       const company = localStorage.getItem("company");
 
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/newLead`, {
-        company: leadCompany,
-        email: leadEmail,
-        phone: leadPhone,
-        country: leadCountry,
-        message: leadMessage,
-        contactName: leadContactName,
-      },{
-        headers: {
-          Authorization: `Bearer ${token}`,
-          authemail: `Bearer ${userEmail}`,
-          company: company
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/newLead`,
+        {
+          company: leadCompany,
+          email: leadEmail,
+          phone: leadPhone,
+          country: leadCountry,
+          message: leadMessage,
+          contactName: leadContactName,
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            authemail: `Bearer ${userEmail}`,
+            company: company,
+          },
+        },
+      );
       setLeadSuccess(true);
       setLeadCompany("");
       setLeadContactName("");
@@ -74,6 +101,8 @@ export default function Header() {
       }, 1500);
     } catch (error) {
       console.error("Error submitting lead", error);
+    } finally {
+      setLeadSubmitting(false);
     }
   };
 
@@ -90,86 +119,81 @@ export default function Header() {
   useEffect(() => {
     // Replace with your real API endpoint
     const fetchClients = async () => {
-   try {
-      var token = localStorage.getItem("token_partner");
-      var userEmail = localStorage.getItem("valid_user_email");
-      var response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/clientList`, {
-       headers: {
+      try {
+        var token = localStorage.getItem("token_partner");
+        var userEmail = localStorage.getItem("valid_user_email");
+        var response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/clientList`,
+          {
+            headers: {
               Authorization: `Bearer ${token}`,
               authemail: `Bearer ${userEmail}`,
             },
-      });
-      setOptions(response.data);
-      if(localStorage.getItem('company')){
-        var company = localStorage.getItem('company');
-        if (company !== null) {
-        setSelectedOption(company);
+          },
+        );
+        setOptions(response.data);
+        if (localStorage.getItem("company")) {
+          var company = localStorage.getItem("company");
+          if (company !== null) {
+            setSelectedOption(company);
+          }
+        } else {
+          setSelectedOption(response.data[0]);
+          localStorage.setItem("company", response.data[0]);
+          setSession({
+            company: response.data[0],
+          });
         }
+      } catch (error) {
+        console.error("Error fetching feedback types", error);
       }
-      else{
-        setSelectedOption(response.data[0]);
-        localStorage.setItem('company',response.data[0]);
-        setSession({
-          company: response.data[0]
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching feedback types", error);
-    }
-  }
+    };
 
-  fetchClients();
+    fetchClients();
   }, []);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
-// useEffect(() => {
-//   function handleClickOutside(event: MouseEvent) {
-//     if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-//       setShowSupportModal(false);
-//     }
-//   }
-
-//   if (showSupportModal) {
-//     document.addEventListener("mousedown", handleClickOutside);
-//   }
-
-//   return () => {
-//     document.removeEventListener("mousedown", handleClickOutside);
-//   };
-// }, [showSupportModal]);
-
-useEffect(() => {
-  function handleClickOutside(event: MouseEvent) {
-    // Client dropdown
-    if (
-      dropdownRef.current &&
-      !dropdownRef.current.contains(event.target as Node)
-    ) {
-      setDropdownOpen(false);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // Client dropdown
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
     }
-  }
 
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, []);
-
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <header className="bg-gradient-to-r from-[#141464] to-[#5C7CB8] px-4 sm:px-12 py-4 flex justify-between items-center shadow-md">
-          {/* Mobile Menu Button */}
-        <div className="lg:hidden mt-2">
-          <button
-            onClick={() => setShowMobileMenu(true)}
-            className="text-white focus:outline-none"
+      {/* Mobile Menu Button */}
+      <div className="lg:hidden mt-2">
+        <button
+          onClick={() => setShowMobileMenu(true)}
+          className="text-white focus:outline-none"
+        >
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
+      </div>
       {/* Left: Logo */}
       <div className="flex items-center space-x-4">
         <button
@@ -177,7 +201,7 @@ useEffect(() => {
           className="flex items-center space-x-2 text-white hover:opacity-80 transition cursor-pointer"
         >
           <img
-            src= {`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Partner-Portal.png`}
+            src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Partner-Portal.png`}
             alt="Logo"
             width={200}
             height={30}
@@ -186,73 +210,76 @@ useEffect(() => {
       </div>
 
       <button
-            className="bg-[#3333ff] text-white px-2 py-1 text-xs sm:hidden rounded-full font-semibold hover:bg-[#786cff] order-1 sm:order-none self-start sm:self-auto cursor-pointer mt-2"
-            onClick={handleNewLead}
-          >
-           Submit New Lead
-          </button>
-
+        className="bg-[#3333ff] text-white px-2 py-1 text-xs sm:hidden rounded-full font-semibold hover:bg-[#786cff] order-1 sm:order-none self-start sm:self-auto cursor-pointer mt-2"
+        onClick={handleNewLead}
+      >
+        Submit New Lead
+      </button>
 
       {/* Right: Dropdown + Support + Logout */}
       <div className="hidden lg:flex items-center space-x-6 relative">
         {/* Custom Dropdown */}
         {options.length > 1 ? (
-        <div className="relative" ref={dropdownRef}>
-        {/* Toggle button (closed: transparent, open: same) */}
-        <button
-          onClick={() => setDropdownOpen((o) => !o)}
-          className="flex items-center space-x-2 px-4 py-2 text-white text-md hover:bg-white/10 transition rounded-[18px] cursor-pointer"
-        >
-          <img src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Layer_1.png`} alt="Client" className="w-5 h-5" />
-          <span>{selectedOption || "Client"}</span>
-          <svg
-            className={`w-4 h-4 text-white transition-transform ${
-              dropdownOpen ? "rotate-180" : ""
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
-
-        {/* Dropdown menu */}
-        {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-54 bg-white text-black rounded-2xl shadow-lg z-50 max-h-56 overflow-y-auto">
-            {options.map((opt, i) => (
-              <div
-                key={i}
-                onClick={() => {
-                  if(opt!=selectedOption){
-                    setSelectedOption(opt);
-                    localStorage.setItem('company',opt);
-                    window.location.reload();
-                  }
-                  setDropdownOpen(false);
-                }}
-                className="px-4 py-3 hover:bg-gray-100 cursor-pointer"
+          <div className="relative" ref={dropdownRef}>
+            {/* Toggle button (closed: transparent, open: same) */}
+            <button
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex items-center space-x-2 px-4 py-2 text-white text-md hover:bg-white/10 transition rounded-[18px] cursor-pointer"
+            >
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Layer_1.png`}
+                alt="Client"
+                className="w-5 h-5"
+              />
+              <span>{selectedOption || "Client"}</span>
+              <svg
+                className={`w-4 h-4 text-white transition-transform ${
+                  dropdownOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {opt}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+
+            {/* Dropdown menu */}
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-54 bg-white text-black rounded-2xl shadow-lg z-50 max-h-56 overflow-y-auto">
+                {options.map((opt, i) => (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (opt != selectedOption) {
+                        setSelectedOption(opt);
+                        localStorage.setItem("company", opt);
+                        window.location.reload();
+                      }
+                      setDropdownOpen(false);
+                    }}
+                    className="px-4 py-3 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {opt}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
-        ):(
-           <div className="flex items-center space-x-2 px-4 py-2 text-white text-md rounded-[18px]">
-    <img
-      src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Layer_1.png`}
-      alt="Client"
-      className="w-5 h-5"
-    />
-    <span>{selectedOption || "Client"}</span>
-  </div>
+        ) : (
+          <div className="flex items-center space-x-2 px-4 py-2 text-white text-md rounded-[18px]">
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL}wp-content/uploads/2025/08/Layer_1.png`}
+              alt="Client"
+              className="w-5 h-5"
+            />
+            <span>{selectedOption || "Client"}</span>
+          </div>
         )}
 
         {/* Support */}
@@ -280,247 +307,373 @@ useEffect(() => {
           />
           <span className="text-md">Logout</span>
         </button>
-         <button
-            className="bg-[#3333ff] text-white px-5 py-2 text-sm rounded-full font-semibold hover:bg-[#786cff] order-1 sm:order-none self-start sm:self-auto cursor-pointer"
-            onClick={handleNewLead}
-          >
-           Submit New Lead
-          </button>
+        <button
+          className="bg-[#3333ff] text-white px-5 py-2 text-sm rounded-full font-semibold hover:bg-[#786cff] order-1 sm:order-none self-start sm:self-auto cursor-pointer"
+          onClick={handleNewLead}
+        >
+          Submit New Lead
+        </button>
       </div>
       {showNewLeadModal && (
-  <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-sm z-50 flex items-center justify-center">
-    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative">
-      {/* Header */}
-      <div className="bg-[#190089] text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Submit New Lead</h2>
-        <button
-          onClick={() => setShowNewLeadModal(false)}
-          className="text-white text-xl cursor-pointer"
-        >
-          x
-        </button>
-      </div>
+        <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative">
+            {/* Header */}
+            <div className="bg-[#190089] text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Submit New Lead</h2>
+              <button
+                onClick={() => setShowNewLeadModal(false)}
+                className="text-white text-xl cursor-pointer"
+              >
+                x
+              </button>
+            </div>
 
-      {/* Body */}
-      <div className="p-6 space-y-4 text-black">
-        <p className="text-[rgba(20, 20, 100, 0.63)]">
-          Partner: <span className="font-medium">{selectedOption}</span>
-        </p>
+            {/* Body */}
+            <div className="p-6 space-y-4 text-black">
+              <p className="text-[rgba(20, 20, 100, 0.63)]">
+                Partner: <span className="font-medium">{selectedOption}</span>
+              </p>
 
-        <label htmlFor="company-name" className="text-[rgba(132, 138, 149, 1)]">Company Name</label>
-        <input
-          type="text"
-          id="company-name"
-          placeholder="Company Name"
-          value={leadCompany}
-          onChange={(e) => setLeadCompany(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <label htmlFor="first-name" className="text-[rgba(132, 138, 149, 1)]">Customer Contact Name</label>
-        <input
-          type="text"
-          id="first-name"
-          placeholder="First Name"
-          value={leadContactName}
-          onChange={(e) => setLeadContactName(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <label htmlFor="customer-email" className="text-[rgba(132, 138, 149, 1)]">Customer Email</label>
-        <input
-          type="email"
-          id="customer-email"
-          placeholder="Customer Email"
-          value={leadEmail}
-          onChange={(e) => setLeadEmail(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-          <label htmlFor="country-code" className="text-[rgba(132, 138, 149, 1)]">Country Code</label>
-          <input
-            type="text"
-            id="country-code"
-            placeholder="Country Code"
-            value={leadCountry}
-            onChange={(e) => setLeadCountry(e.target.value)}
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          </div>
-          <div>
-          <label htmlFor="phone-number" className="text-[rgba(132, 138, 149, 1)]">Phone Number</label>
-          <input
-            type="text"
-            id="phone-number"
-            placeholder="Add your phone number"
-            value={leadPhone}
-            onChange={(e) => setLeadPhone(e.target.value)}
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+              <label
+                htmlFor="company-name"
+                className="text-[rgba(132, 138, 149, 1)]"
+              >
+                Company Name *
+              </label>
+
+              <input
+                type="text"
+                id="company-name"
+                placeholder="Company Name"
+                value={leadCompany}
+                onChange={(e) => {
+                  setLeadCompany(e.target.value);
+                  if (leadErrors.leadCompany)
+                    setLeadErrors((prev) => ({ ...prev, leadCompany: "" }));
+                }}
+                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  leadErrors.leadCompany ? "border-red-500 mb-0" : ""
+                }`}
+              />
+              {leadErrors.leadCompany && (
+                <p className="text-red-500 text-sm">{leadErrors.leadCompany}</p>
+              )}
+
+              <label
+                htmlFor="first-name"
+                className="text-[rgba(132, 138, 149, 1)]"
+              >
+                Customer Contact Name *
+              </label>
+
+              <input
+                type="text"
+                id="first-name"
+                placeholder="First Name"
+                value={leadContactName}
+                onChange={(e) => {
+                  setLeadContactName(e.target.value);
+                  if (leadErrors.leadContactName)
+                    setLeadErrors((prev) => ({ ...prev, leadContactName: "" }));
+                }}
+                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  leadErrors.leadContactName ? "border-red-500 mb-0" : ""
+                }`}
+              />
+              {leadErrors.leadContactName && (
+                <p className="text-red-500 text-sm">
+                  {leadErrors.leadContactName}
+                </p>
+              )}
+              <label
+                htmlFor="customer-email"
+                className="text-[rgba(132, 138, 149, 1)]"
+              >
+                Customer Email *
+              </label>
+
+              <input
+                type="email"
+                id="customer-email"
+                placeholder="Customer Email"
+                value={leadEmail}
+                onChange={(e) => {
+                  setLeadEmail(e.target.value);
+                  if (leadErrors.leadEmail)
+                    setLeadErrors((prev) => ({ ...prev, leadEmail: "" }));
+                }}
+                className={`w-full border rounded-lg px-4 py-2  focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  leadErrors.leadEmail ? "border-red-500 mb-0" : ""
+                }`}
+              />
+              {leadErrors.leadEmail && (
+                <p className="text-red-500 text-sm">{leadErrors.leadEmail}</p>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="country-code"
+                    className="text-[rgba(132, 138, 149, 1)]"
+                  >
+                    Country Code *
+                  </label>
+
+                  <input
+                    type="text"
+                    id="country-code"
+                    placeholder="Country Code"
+                    value={leadCountry}
+                    onChange={(e) => {
+                      setLeadCountry(e.target.value);
+                      if (leadErrors.leadCountry)
+                        setLeadErrors((prev) => ({ ...prev, leadCountry: "" }));
+                    }}
+                    className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      leadErrors.leadCountry ? "border-red-500" : ""
+                    }`}
+                  />
+                  {leadErrors.leadCountry && (
+                    <p className="text-red-500 text-sm">
+                      {leadErrors.leadCountry}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor="phone-number"
+                    className="text-[rgba(132, 138, 149, 1)]"
+                  >
+                    Phone Number *
+                  </label>
+
+                  <input
+                    type="text"
+                    id="phone-number"
+                    placeholder="Add your phone number"
+                    value={leadPhone}
+                    onChange={(e) => {
+                      setLeadPhone(e.target.value);
+                      if (leadErrors.leadPhone)
+                        setLeadErrors((prev) => ({ ...prev, leadPhone: "" }));
+                    }}
+                    className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      leadErrors.leadPhone ? "border-red-500" : ""
+                    }`}
+                  />
+                  {leadErrors.leadPhone && (
+                    <p className="text-red-500 text-sm">
+                      {leadErrors.leadPhone}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <label
+                htmlFor="additional-notes"
+                className="text-[rgba(132, 138, 149, 1)]"
+              >
+                Additional Notes
+              </label>
+              <textarea
+                id="additional-notes"
+                placeholder="Additional Notes"
+                value={leadMessage}
+                onChange={(e) => setLeadMessage(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+
+              <button
+                className="w-full bg-[#141464] text-white font-semibold rounded-full py-2 hover:bg-indigo-800 transition cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleLeadSubmit}
+                disabled={leadSubmitting}
+              >
+                {leadSubmitting ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit"
+                )}
+              </button>
+              {leadSuccess && (
+                <div className="text-green-600 font-medium text-center mt-2">
+                  ✅ Lead submitted successfully!
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <label htmlFor="additional-notes" className="text-[rgba(132, 138, 149, 1)]">Additional Notes</label>
-        <textarea
-          id="additional-notes"
-          placeholder="Additional Notes" 
-          value={leadMessage}
-          onChange={(e) => setLeadMessage(e.target.value)}
-          className="w-full border rounded-lg px-4 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-
-        <button className="w-full bg-[#141464] text-white font-semibold rounded-full py-2 hover:bg-indigo-800 transition cursor-pointer" onClick={handleLeadSubmit}>
-          Submit
-        </button>
-        {leadSuccess && (
-          <div className="text-green-600 font-medium text-center mt-2">
-            ✅ Lead submitted successfully!
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {showSupportModal && (
-  <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-sm z-50 flex items-center justify-center">
-    <div ref={modalRef} className="bg-white rounded-xl shadow-xl w-full max-w-md relative">
-      {/* Header */}
-      <div className="bg-[#190089] text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Contact Us</h2>
-        <button
-          onClick={() => setShowSupportModal(false)}
-          className="text-white text-xl cursor-pointer"
-        >
-          x
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="p-6 space-y-4">
-        <p className="text-gray-600 text-sm">
-          Have a question or need assistance? Send us a message and we’ll get back to you as soon as possible.
-        </p>
-        <input
-        type="text"
-        placeholder="Name"
-        value={supportName}
-        onChange={(e) => setSupportName(e.target.value)}
-        className="w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-
-      <input
-        type="email"
-        placeholder="Email"
-        value={supportEmail}
-        onChange={(e) => setSupportEmail(e.target.value)}
-        className="w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-
-        <div className="relative">
-        <button
-          onClick={() => setCategoryDropdownOpen((prev) => !prev)}
-          className="flex items-center justify-between w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-        >
-          <span>{selectedCategory}</span>
-          <svg
-            className={`w-4 h-4 text-gray-500 transition-transform ${
-              categoryDropdownOpen ? "rotate-180" : ""
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="fixed inset-0 bg-black/[0.4] backdrop-blur-sm z-50 flex items-center justify-center">
+          <div
+            ref={modalRef}
+            className="bg-white rounded-xl shadow-xl w-full max-w-md relative"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        {categoryDropdownOpen && (
-          <div className="absolute z-10 mt-2 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
-            {categoryOptions.map((option, idx) => (
-              <div
-                key={idx}
-                onClick={() => {
-                  setSelectedCategory(option);
-                  setCategoryDropdownOpen(false);
-                }}
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-black"
+            {/* Header */}
+            <div className="bg-[#190089] text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Contact Us</h2>
+              <button
+                onClick={() => setShowSupportModal(false)}
+                className="text-white text-xl cursor-pointer"
               >
-                {option}
+                x
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <p className="text-gray-600 text-sm">
+                Have a question or need assistance? Send us a message and we’ll
+                get back to you as soon as possible.
+              </p>
+              <input
+                type="text"
+                placeholder="Name"
+                value={supportName}
+                onChange={(e) => setSupportName(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+
+              <input
+                type="email"
+                placeholder="Email"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+
+              <div className="relative">
+                <button
+                  onClick={() => setCategoryDropdownOpen((prev) => !prev)}
+                  className="flex items-center justify-between w-full border rounded-lg px-4 py-2 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <span>{selectedCategory}</span>
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${
+                      categoryDropdownOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                {categoryDropdownOpen && (
+                  <div className="absolute z-10 mt-2 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
+                    {categoryOptions.map((option, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          setSelectedCategory(option);
+                          setCategoryDropdownOpen(false);
+                        }}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-black"
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
               <textarea
-              placeholder="Message"
-              value={supportMessage}
-              onChange={(e) => setSupportMessage(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
-            />
+                placeholder="Message"
+                value={supportMessage}
+                onChange={(e) => setSupportMessage(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black"
+              />
 
-              <button className="w-full bg-[#462EFC] text-white font-semibold rounded-full py-2 hover:bg-indigo-700 transition cursor-pointer"
-              onClick={async () => {
-              try {
-                const token = localStorage.getItem("token_partner");
-                const userEmail = localStorage.getItem("valid_user_email");
-                const company = localStorage.getItem("company");
+              <button
+                className="w-full bg-[#462EFC] text-white font-semibold rounded-full py-2 hover:bg-indigo-700 transition cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem("token_partner");
+                    const userEmail = localStorage.getItem("valid_user_email");
+                    const company = localStorage.getItem("company");
 
-                if(company){
-                  const response = await axios.post(
-                  `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/submitsupport`,
-                  {
-                    name: supportName,
-                    email: supportEmail,
-                    category: selectedCategory,
-                    message: supportMessage,
-                  },
-                  {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      authemail: `Bearer ${userEmail}`,
-                      company: company
-                    },
+                    if (company) {
+                      const response = await axios.post(
+                        `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/submitsupport`,
+                        {
+                          name: supportName,
+                          email: supportEmail,
+                          category: selectedCategory,
+                          message: supportMessage,
+                        },
+                        {
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            authemail: `Bearer ${userEmail}`,
+                            company: company,
+                          },
+                        },
+                      );
+                    } else {
+                      const response = await axios.post(
+                        `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/submitsupport`,
+                        {
+                          name: supportName,
+                          email: supportEmail,
+                          category: selectedCategory,
+                          message: supportMessage,
+                        },
+                        {
+                          headers: {
+                            Authorization: `Bearer ${token}`,
+                            authemail: `Bearer ${userEmail}`,
+                          },
+                        },
+                      );
+                    }
+
+                    setSupportSuccess(true);
+                    setSupportName("");
+                    setSupportEmail("");
+                    setSupportMessage("");
+                    setSelectedCategory("Select a category");
+
+                    setTimeout(() => {
+                      setShowSupportModal(false);
+                      setSupportSuccess(false);
+                    }, 1500);
+                  } catch (err) {
+                    alert("Failed to submit support request.");
+                    console.error(err);
                   }
-                );
-                }
-                else{
-                  const response = await axios.post(
-                  `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/submitsupport`,
-                  {
-                    name: supportName,
-                    email: supportEmail,
-                    category: selectedCategory,
-                    message: supportMessage,
-                  },
-                  {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      authemail: `Bearer ${userEmail}`,
-                    },
-                  }
-                );
-                }
-              
-                setSupportSuccess(true);
-                setSupportName("");
-                setSupportEmail("");
-                setSupportMessage("");
-                setSelectedCategory("Select a category");
-
-                setTimeout(() => {
-                  setShowSupportModal(false);
-                  setSupportSuccess(false);
-                }, 1500);
-              } catch (err) {
-                alert("Failed to submit support request.");
-                console.error(err);
-              }
-            }}
+                }}
               >
                 Submit
               </button>
-               {supportSuccess && (
+              {supportSuccess && (
                 <div className="text-green-600 font-medium text-center mt-2">
                   ✅ Contact submitted successfully!
                 </div>
@@ -530,88 +683,96 @@ useEffect(() => {
         </div>
       )}
       {/* Mobile Sidebar Menu */}
-{showMobileMenu && (
-  <div className="fixed inset-0 z-50 flex">
-    {/* Overlay */}
-    <div
-      className="fixed inset-0 bg-black opacity-50"
-      onClick={() => setShowMobileMenu(false)}
-    />
+      {showMobileMenu && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black opacity-50"
+            onClick={() => setShowMobileMenu(false)}
+          />
 
-    {/* Sidebar */}
-    <div className={`fixed top-12 left-0 ${dropdownOpen ? "w-68" : "w-52"} bg-[#EFEFEF] shadow-lg z-50 transform transition-transform duration-300 ease-in-out rounded-2xl ${
-    showMobileMenu ? "translate-x-0" : "translate-x-full"
-  }`}>
-      <button
-        onClick={() => setShowMobileMenu(false)}
-        className="absolute top-4 right-4 text-gray-800"
-      >
-        ✕
-      </button>
-
-      <div className="flex flex-col space-y-4 mb-8 mt-8">
-        <div className="relative text-black " ref={dropdownRef}>
-        {/* Toggle button (closed: transparent, open: same) */}
-        <button
-          onClick={() => setDropdownOpen((o) => !o)}
-          className="flex items-center space-x-2 px-4 py-2 font-semibold text-md hover:bg-white/10 transition rounded-[18px] cursor-pointer"
-        >
-          <span>{selectedOption || "Client"}</span>
-          <svg
-            className={`w-4 h-4 text-black transition-transform ${
-              dropdownOpen ? "rotate-180" : ""
+          {/* Sidebar */}
+          <div
+            className={`fixed top-12 left-0 ${dropdownOpen ? "w-68" : "w-52"} bg-[#EFEFEF] shadow-lg z-50 transform transition-transform duration-300 ease-in-out rounded-2xl ${
+              showMobileMenu ? "translate-x-0" : "translate-x-full"
             }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
+            <button
+              onClick={() => setShowMobileMenu(false)}
+              className="absolute top-4 right-4 text-gray-800"
+            >
+              ✕
+            </button>
 
-        {/* Dropdown menu */}
-        {dropdownOpen && (
-          <div className="text-black-400 mt-2 w-54 bg-white text-black rounded-2xl shadow-lg z-50 max-h-56 overflow-y-auto">
-            {options.map((opt, i) => (
-              <div
-                key={i}
-                onClick={() => {
-                  if(opt!=selectedOption){
-                    setSelectedOption(opt);
-                    localStorage.setItem('company',opt);
-                    window.location.reload();
-                  }
-                  setDropdownOpen(false);
-                }}
-                className="px-4 py-3 hover:bg-gray-100 cursor-pointer"
-              >
-                {opt}
+            <div className="flex flex-col space-y-4 mb-8 mt-8">
+              <div className="relative text-black " ref={dropdownRef}>
+                {/* Toggle button (closed: transparent, open: same) */}
+                <button
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="flex items-center space-x-2 px-4 py-2 font-semibold text-md hover:bg-white/10 transition rounded-[18px] cursor-pointer"
+                >
+                  <span>{selectedOption || "Client"}</span>
+                  <svg
+                    className={`w-4 h-4 text-black transition-transform ${
+                      dropdownOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                {/* Dropdown menu */}
+                {dropdownOpen && (
+                  <div className="text-black-400 mt-2 w-54 bg-white text-black rounded-2xl shadow-lg z-50 max-h-56 overflow-y-auto">
+                    {options.map((opt, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          if (opt != selectedOption) {
+                            setSelectedOption(opt);
+                            localStorage.setItem("company", opt);
+                            window.location.reload();
+                          }
+                          setDropdownOpen(false);
+                        }}
+                        className="px-4 py-3 hover:bg-gray-100 cursor-pointer"
+                      >
+                        {opt}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+              <button
+                onClick={() => {
+                  handleSupport();
+                  setShowMobileMenu(false);
+                }}
+                className="text-left pl-4 text-blue-900 font-semibold"
+              >
+                Support
+              </button>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setShowMobileMenu(false);
+                }}
+                className="text-left pl-4 text-red-600 font-semibold"
+              >
+                Logout
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-        <button onClick={()=>{
-          handleSupport();
-          setShowMobileMenu(false);
-         }} className="text-left pl-4 text-blue-900 font-semibold">
-          Support
-        </button>
-        <button onClick={()=>{
-          handleLogout(); 
-          setShowMobileMenu(false);}} className="text-left pl-4 text-red-600 font-semibold">
-          Logout
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+        </div>
+      )}
     </header>
   );
 }
