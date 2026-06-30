@@ -90,6 +90,35 @@ export default function Library() {
     return { url: baseUrl, type: "unsupported" as const };
   }
 
+const openDocument = async (documentId: number) => {
+  try {
+    const token = localStorage.getItem("token_partner");
+    const userEmail = localStorage.getItem("valid_user_email");
+    const company = localStorage.getItem("company");
+
+    if (!token || !userEmail) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const response = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}wp-json/custom/v1/document-url?id=${documentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          authemail: `Bearer ${userEmail}`,
+          company: company || "",
+        },
+      }
+    );
+
+    window.open(response.data.url, "_blank");
+  } catch (error) {
+    console.error("Unable to open document", error);
+    alert("Unable to open document.");
+  }
+};
+
   return (
     <div className="sm:p-4">
       {/* Tabs */}
@@ -122,9 +151,11 @@ export default function Library() {
           return (
             <a
               key={item.ID}
-              href={item.guid}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                openDocument(item.ID);
+              }}
               className="bg-white overflow-hidden transition"
             >
               <div className="w-full sm:h-64 overflow-hidden flex items-center justify-center bg-gray-50">
